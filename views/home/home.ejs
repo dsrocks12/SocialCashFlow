@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f7fafd;
+      margin: 0;
+      padding: 0;
+    }
+    .summary-box {
+      flex: 1;
+      padding: 20px;
+      border-radius: 10px;
+    }
+    .youll-receive { background-color: #e7f3fd; color: #0184ff; }
+    .youll-pay { background-color: #e6f7f0; color: #2ecc71; }
+    .net-balance { background-color: #e7f3fd; }
+    .week-button {
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      cursor: pointer;
+      flex: 1;
+      margin: 0 5px;
+      background-color: #e8f0f9;
+    }
+    .active-week {
+      background-color: #ffffff !important;
+    }
+    .friend-entry {
+      border-bottom: 1px solid #eee;
+      padding: 8px 0;
+    }
+    .friend-header {
+      display: flex;
+      justify-content: space-between;
+    }
+    .description-list {
+      font-size: 13px;
+      color: #666;
+      margin-top: 5px;
+      margin-left: 5px;
+    }
+    .description-list div {
+      margin-bottom: 3px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div style="background-color: white; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e0e0e0;">
+    <h2 style="color: #01a3ff; margin: 0;">SocialCashFlow</h2>
+    <div>
+      <span style="margin-right: 20px; font-weight: 500;">Welcome, <%= currentUser %></span>
+      <button onclick="window.location.href='/addtransaction'" 
+        style="padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 5px;">
+        Add Transaction
+      </button>
+    </div>
+  </div>
+
+  <!-- Dashboard Content -->
+  <div style="padding: 40px;">
+    <h1 style="margin-bottom: 5px;">Cash Flow Dashboard</h1>
+    <p style="margin-top: 0; color: #666;">Track your money exchanges with friends over the next 8 weeks.</p>
+
+    <!-- Summary Boxes -->
+    <div style="display: flex; gap: 20px; margin-top: 30px;">
+      <div class="summary-box youll-receive">
+        <p style="margin: 0; font-weight: bold;">You'll Receive</p>
+        <h2 id="receiveAmount" style="margin: 10px 0 0 0;">+ ₹0.00</h2>
+      </div>
+      <div class="summary-box youll-pay">
+        <p style="margin: 0; font-weight: bold;">You'll Pay</p>
+        <h2 id="payAmount" style="margin: 10px 0 0 0;">– ₹0.00</h2>
+      </div>
+      <div class="summary-box net-balance">
+        <p style="margin: 0; font-weight: bold;">Net Balance</p>
+        <h2 id="netAmount" style="margin: 10px 0 0 0;"><span>💳</span> ₹0.00</h2>
+      </div>
+    </div>
+
+    <!-- Weekly Payment Schedule -->
+    <div style="margin-top: 40px; background-color: white; padding: 20px; border-radius: 10px; border: 1px solid #e0e0e0;">
+      <h2 style="margin: 0 0 10px 0;">Weekly Payment Schedule</h2>
+      <p style="color: #666;">View expected payments for the next 8 weeks.</p>
+
+      <!-- Week Selector -->
+      <div style="display: flex; justify-content: space-between; margin-top: 20px; padding: 10px 0; background-color: #f1f5f9; border-radius: 5px;" id="weekButtons">
+        <% weeks.forEach((week, index) => { %>
+          <button class="week-button" data-key="<%= week.key %>"><%= week.label %></button>
+        <% }) %>
+      </div>
+
+      <!-- Dynamic Week Info -->
+      <div style="margin-top: 20px;">
+        <strong id="weekRange"><%= weeks[0].range %></strong>
+        <div id="weekDetails" style="margin-top: 10px;">
+          <p style="color: #666;">No payments scheduled for this week.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align: center; padding: 20px; background-color: #f8f8f8; color: #555;">
+    SocialCashFlow – Track your money exchanges with friends
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    const repaymentCalendar = <%- JSON.stringify(repaymentCalendar) %>;
+    const weeks = <%- JSON.stringify(weeks) %>;
+    const weekButtons = document.querySelectorAll('.week-button');
+    const rangeEl = document.getElementById('weekRange');
+    const detailsEl = document.getElementById('weekDetails');
+    const receiveEl = document.getElementById('receiveAmount');
+    const payEl = document.getElementById('payAmount');
+    const netEl = document.getElementById('netAmount');
+
+    function updateWeekView(key) {
+      const week = weeks.find(w => w.key === key);
+      const data = repaymentCalendar[key] || {};
+
+      let html = '';
+      let totalReceive = 0;
+      let totalPay = 0;
+
+      const friends = Object.keys(data);
+      if (friends.length === 0) {
+        html = '<p style="color: #666;">No payments scheduled for this week.</p>';
+      } else {
+        friends.forEach(friend => {
+          const { youOwe, owesYou, transactions = [] } = data[friend];
+
+          const visibleTransactions = transactions.filter(tx => tx.status !== 'completed');
+          if (visibleTransactions.length === 0) return;
+
+          const transactionHtml = visibleTransactions.map(tx => `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
+              <span>– ${tx.type === 'owesYou' ? 'They owe for' : 'You owe for'}: ${tx.description} (₹${tx.amount.toFixed(2)})</span>
+              <button onclick="markTransactionCompleted('${tx._id}', '${key}')" style="padding: 3px 7px; font-size: 12px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;">
+                Mark as Completed
+              </button>
+            </div>
+          `).join('');
+
+          totalReceive += owesYou || 0;
+          totalPay += youOwe || 0;
+
+          html += `
+            <div class="friend-entry">
+              <div class="friend-header">
+                <div><strong>${friend}</strong></div>
+                <div>
+                  ${owesYou ? `Owes You: ₹${owesYou.toFixed(2)} ` : ''}
+                  ${youOwe ? `You Owe: ₹${youOwe.toFixed(2)}` : ''}
+                </div>
+              </div>
+              <div class="description-list">
+                ${transactionHtml}
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      rangeEl.textContent = week.range;
+      detailsEl.innerHTML = html;
+      receiveEl.textContent = '+ ₹' + totalReceive.toFixed(2);
+      payEl.textContent = '– ₹' + totalPay.toFixed(2);
+      const net = totalReceive - totalPay;
+      netEl.textContent = '💳 ₹' + net.toFixed(2);
+    }
+
+    async function markTransactionCompleted(transactionId, weekKey) {
+      try {
+        const response = await fetch('/completeTransaction', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ transactionId })
+        });
+
+        if (response.ok) {
+         
+          const weekData = repaymentCalendar[weekKey];
+          for (const friend in weekData) {
+            weekData[friend].transactions = weekData[friend].transactions.filter(tx => tx._id !== transactionId);
+          }
+          updateWeekView(weekKey);
+        } else {
+          alert('Failed to mark transaction as completed.');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error occurred while marking transaction.');
+      }
+    }
+
+    weekButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        weekButtons.forEach(b => b.classList.remove('active-week'));
+        button.classList.add('active-week');
+        updateWeekView(button.getAttribute('data-key'));
+      });
+    });
+
+    
+    weekButtons[0].classList.add('active-week');
+    updateWeekView(weeks[0].key);
+  </script>
+
+</body>
+</html>
